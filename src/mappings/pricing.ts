@@ -4,9 +4,9 @@ import { BigDecimal, Address } from '@graphprotocol/graph-ts/index'
 import { ZERO_BD, factoryContract, ADDRESS_ZERO } from './helpers'
 
 const ETH_ADDRESS = '0x0000000000000000000000000000000000000000'
-const USDC_ETH_PAIR = '0x61Bb2Fda13600c497272A8DD029313AfdB125fd3' // created 10634677
-const DAI_ETH_PAIR = '0x75116BD1AB4B0065B44E1A4ea9B4180A171406ED' // created block 10634917
-const USDT_ETH_PAIR = '0xbeabeF3fc02667D8BD3f702Ae0bB2C4edb3640cc' // created block 10638158
+const USDC_ETH_PAIR = '0x61bb2fda13600c497272a8dd029313afdb125fd3' // created 10634677
+const DAI_ETH_PAIR = '0x75116bd1ab4b0065b44e1a4ea9b4180a171406ed' // created block 10634917
+const USDT_ETH_PAIR = '0xbeabef3fc02667d8bd3f702ae0bb2c4edb3640cc' // created block 10638158
 
 // dummy for testing
 export function getEthPriceInUSD(): BigDecimal {
@@ -18,23 +18,23 @@ export function getEthPriceInUSD(): BigDecimal {
 
   // all 3 have been created
   if (daiPair !== null && usdcPair !== null && usdtPair !== null) {
-    let totalLiquidityETH = daiPair.reserve1.plus(usdcPair.reserve1).plus(usdtPair.reserve0)
-    let daiWeight = daiPair.reserve1.div(totalLiquidityETH)
-    let usdcWeight = usdcPair.reserve1.div(totalLiquidityETH)
+    let totalLiquidityETH = daiPair.reserve0.plus(usdcPair.reserve0).plus(usdtPair.reserve0)
+    let daiWeight = daiPair.reserve0.div(totalLiquidityETH)
+    let usdcWeight = usdcPair.reserve0.div(totalLiquidityETH)
     let usdtWeight = usdtPair.reserve0.div(totalLiquidityETH)
-    return daiPair.token0Price
+    return daiPair.token1Price
       .times(daiWeight)
-      .plus(usdcPair.token0Price.times(usdcWeight))
+      .plus(usdcPair.token1Price.times(usdcWeight))
       .plus(usdtPair.token1Price.times(usdtWeight))
     // dai and USDC have been created
   } else if (daiPair !== null && usdcPair !== null) {
-    let totalLiquidityETH = daiPair.reserve1.plus(usdcPair.reserve1)
-    let daiWeight = daiPair.reserve1.div(totalLiquidityETH)
-    let usdcWeight = usdcPair.reserve1.div(totalLiquidityETH)
-    return daiPair.token0Price.times(daiWeight).plus(usdcPair.token0Price.times(usdcWeight))
+    let totalLiquidityETH = daiPair.reserve0.plus(usdcPair.reserve0)
+    let daiWeight = daiPair.reserve0.div(totalLiquidityETH)
+    let usdcWeight = usdcPair.reserve0.div(totalLiquidityETH)
+    return daiPair.token1Price.times(daiWeight).plus(usdcPair.token1Price.times(usdcWeight))
     // USDC is the only pair so far
   } else if (usdcPair !== null) {
-    return usdcPair.token0Price
+    return usdcPair.token1Price
   } else {
     return ZERO_BD
   }
@@ -97,6 +97,8 @@ export function findEthPerToken(token: Token, maxDepthReached: boolean): BigDeci
 // token where amounts should contribute to tracked volume and liquidity
 let WHITELIST: string[] = [
   '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2', // WETH
+   ETH_ADDRESS, // ETH
+  '0x0000000000004946c0e9f43f4dee607b0ef1fa1c', // CHI
   '0x6b175474e89094c44da98b954eedeac495271d0f', // DAI
   '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', // USDC
   '0xdac17f958d2ee523a2206206994597c13d831ec7', // USDT

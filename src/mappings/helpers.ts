@@ -185,7 +185,7 @@ export function handleSync(pairAddress: Address): void {
   let mooniswap = MooniswapFactory.load(FACTORY_ADDRESS)
   let reserves = fetchReserves(pair.id)
 
-  // reset factory liquidity by subtracting onluy tarcked liquidity
+  // reset factory liquidity by subtracting only tracked liquidity
   mooniswap.totalLiquidityETH = mooniswap.totalLiquidityETH.minus(pair.trackedReserveETH as BigDecimal)
 
   pair.reserve0 = convertTokenToDecimal(reserves[0], token0.decimals)

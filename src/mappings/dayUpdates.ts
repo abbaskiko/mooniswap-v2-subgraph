@@ -9,7 +9,7 @@ const maxTokenDayDatas = 10
 const maxPairDayDatas = 10
 
 export function updateUniswapDayData(event: EthereumEvent): void {
-  let uniswap = MooniswapFactory.load(FACTORY_ADDRESS)
+  let mooniswap = MooniswapFactory.load(FACTORY_ADDRESS)
   let timestamp = event.block.timestamp.toI32()
   let dayID = timestamp / 86400
   let dayStartTimestamp = dayID * 86400
@@ -24,14 +24,14 @@ export function updateUniswapDayData(event: EthereumEvent): void {
     uniswapDayData.totalLiquidityUSD = ZERO_BD
     uniswapDayData.totalLiquidityETH = ZERO_BD
     uniswapDayData.maxStored = maxTokenDayDatas
-    uniswapDayData.mostLiquidTokens = uniswap.mostLiquidTokens
+    uniswapDayData.mostLiquidTokens = mooniswap.mostLiquidTokens
     uniswapDayData.txCount = ZERO_BI
     uniswapDayData.save()
   }
   uniswapDayData = MooniswapDayData.load(dayID.toString())
-  uniswapDayData.totalLiquidityUSD = uniswap.totalLiquidityUSD
-  uniswapDayData.totalLiquidityETH = uniswap.totalLiquidityETH
-  uniswapDayData.txCount = uniswap.txCount
+  uniswapDayData.totalLiquidityUSD = mooniswap.totalLiquidityUSD
+  uniswapDayData.totalLiquidityETH = mooniswap.totalLiquidityETH
+  uniswapDayData.txCount = mooniswap.txCount
   uniswapDayData.save()
 }
 
