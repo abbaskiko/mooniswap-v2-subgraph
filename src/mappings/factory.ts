@@ -1,7 +1,7 @@
 /* eslint-disable prefer-const */
 import { log } from '@graphprotocol/graph-ts'
-import { UniswapFactory, Pair, Token, Bundle } from '../types/schema'
-import { PairCreated } from '../types/Factory/Factory'
+import { MooniswapFactory, Pair, Token, Bundle } from '../types/schema'
+import { Deployed } from '../types/Factory/Factory'
 import { Pair as PairTemplate } from '../types/templates'
 import {
   FACTORY_ADDRESS,
@@ -13,11 +13,11 @@ import {
   fetchTokenTotalSupply
 } from './helpers'
 
-export function handleNewPair(event: PairCreated): void {
+export function handleNewPair(event: Deployed): void {
   // load factory (create if first exchange)
-  let factory = UniswapFactory.load(FACTORY_ADDRESS)
+  let factory = MooniswapFactory.load(FACTORY_ADDRESS)
   if (factory == null) {
-    factory = new UniswapFactory(FACTORY_ADDRESS)
+    factory = new MooniswapFactory(FACTORY_ADDRESS)
     factory.pairCount = 0
     factory.pairs = []
     factory.totalVolumeETH = ZERO_BD
@@ -36,16 +36,16 @@ export function handleNewPair(event: PairCreated): void {
   factory.save()
 
   // create the tokens
-  let token0 = Token.load(event.params.token0.toHexString())
-  let token1 = Token.load(event.params.token1.toHexString())
+  let token0 = Token.load(event.params.token1.toHexString())
+  let token1 = Token.load(event.params.token2.toHexString())
 
   // fetch info if null
   if (token0 == null) {
-    token0 = new Token(event.params.token0.toHexString())
-    token0.symbol = fetchTokenSymbol(event.params.token0)
-    token0.name = fetchTokenName(event.params.token0)
-    token0.totalSupply = fetchTokenTotalSupply(event.params.token0)
-    let decimals = fetchTokenDecimals(event.params.token0)
+    token0 = new Token(event.params.token1.toHexString())
+    token0.symbol = fetchTokenSymbol(event.params.token1)
+    token0.name = fetchTokenName(event.params.token1)
+    token0.totalSupply = fetchTokenTotalSupply(event.params.token1)
+    let decimals = fetchTokenDecimals(event.params.token1)
     // bail if we couldn't figure out the decimals
     if (decimals === null) {
       log.debug('mybug the decimal on token 0 was null', [])
@@ -64,11 +64,11 @@ export function handleNewPair(event: PairCreated): void {
 
   // fetch info if null
   if (token1 == null) {
-    token1 = new Token(event.params.token1.toHexString())
-    token1.symbol = fetchTokenSymbol(event.params.token1)
-    token1.name = fetchTokenName(event.params.token1)
-    token1.totalSupply = fetchTokenTotalSupply(event.params.token1)
-    let decimals = fetchTokenDecimals(event.params.token1)
+    token1 = new Token(event.params.token2.toHexString())
+    token1.symbol = fetchTokenSymbol(event.params.token2)
+    token1.name = fetchTokenName(event.params.token2)
+    token1.totalSupply = fetchTokenTotalSupply(event.params.token2)
+    let decimals = fetchTokenDecimals(event.params.token2)
 
     // bail if we couldn't figure out the decimals
     if (decimals === null) {
@@ -86,14 +86,14 @@ export function handleNewPair(event: PairCreated): void {
   }
 
   let newAllPairsArray0 = token0.allPairs
-  newAllPairsArray0.push(event.params.pair.toHexString())
+  newAllPairsArray0.push(event.params.mooniswap.toHexString())
   token0.allPairs = newAllPairsArray0
 
   let newAllPairsArray1 = token1.allPairs
-  newAllPairsArray1.push(event.params.pair.toHexString())
+  newAllPairsArray1.push(event.params.mooniswap.toHexString())
   token1.allPairs = newAllPairsArray1
 
-  let pair = new Pair(event.params.pair.toHexString()) as Pair
+  let pair = new Pair(event.params.mooniswap.toHexString()) as Pair
   pair.token0 = token0.id
   pair.token1 = token1.id
   pair.createdAtTimestamp = event.block.timestamp
@@ -117,7 +117,7 @@ export function handleNewPair(event: PairCreated): void {
   factory.pairs = factoryPairs
 
   // create the tracked contract based on the template
-  PairTemplate.create(event.params.pair)
+  PairTemplate.create(event.params.mooniswap)
 
   // save updated values
   token0.save()

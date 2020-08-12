@@ -3,18 +3,18 @@ import { Pair, Token, Bundle } from '../types/schema'
 import { BigDecimal, Address } from '@graphprotocol/graph-ts/index'
 import { ZERO_BD, factoryContract, ADDRESS_ZERO } from './helpers'
 
-const WETH_ADDRESS = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2'
-const USDC_WETH_PAIR = '0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc' // created 10008355
-const DAI_WETH_PAIR = '0xa478c2975ab1ea89e8196811f51a7b7ade33eb11' // created block 10042267
-const USDT_WETH_PAIR = '0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852' // created block 10093341
+const ETH_ADDRESS = '0x0000000000000000000000000000000000000000'
+const USDC_ETH_PAIR = '0x61Bb2Fda13600c497272A8DD029313AfdB125fd3' // created 10634677
+const DAI_ETH_PAIR = '0x75116BD1AB4B0065B44E1A4ea9B4180A171406ED' // created block 10634917
+const USDT_ETH_PAIR = '0xbeabeF3fc02667D8BD3f702Ae0bB2C4edb3640cc' // created block 10638158
 
 // dummy for testing
 export function getEthPriceInUSD(): BigDecimal {
   // fetch eth prices for each stablecoin
 
-  let daiPair = Pair.load(DAI_WETH_PAIR) // dai is token0
-  let usdcPair = Pair.load(USDC_WETH_PAIR) // usdc is token0
-  let usdtPair = Pair.load(USDT_WETH_PAIR) // usdt is token1
+  let daiPair = Pair.load(DAI_ETH_PAIR) // dai is token1
+  let usdcPair = Pair.load(USDC_ETH_PAIR) // usdc is token1
+  let usdtPair = Pair.load(USDT_ETH_PAIR) // usdt is token1
 
   // all 3 have been created
   if (daiPair !== null && usdcPair !== null && usdtPair !== null) {
@@ -45,16 +45,16 @@ export function getEthPriceInUSD(): BigDecimal {
  * @todo update to be derived ETH (add stablecoin estimates)
  **/
 export function findEthPerToken(token: Token, maxDepthReached: boolean): BigDecimal {
-  let tokenWethPair = factoryContract.getPair(Address.fromString(token.id), Address.fromString(WETH_ADDRESS))
+  let tokenEthPair = factoryContract.pools(Address.fromString(token.id), Address.fromString(ETH_ADDRESS))
 
-  if (tokenWethPair.toHexString() != ADDRESS_ZERO) {
-    let wethPair = Pair.load(tokenWethPair.toHexString())
-    if (wethPair.token0 == token.id) {
+  if (tokenEthPair.toHexString() != ADDRESS_ZERO) {
+    let ethPair = Pair.load(tokenEthPair.toHexString())
+    if (ethPair.token0 == token.id) {
       // our token is token 0
-      return wethPair.token1Price
+      return ethPair.token1Price
     } else {
       // our token is token 1
-      return wethPair.token0Price
+      return ethPair.token0Price
     }
   } else if (!maxDepthReached) {
     let allPairs = token.allPairs as Array<string>
@@ -126,7 +126,7 @@ export function getTrackedVolumeUSD(
   let bundle = Bundle.load('1')
   let price0 = token0.derivedETH.times(bundle.ethPrice)
   let price1 = token1.derivedETH.times(bundle.ethPrice)
-  let pairAddress = factoryContract.getPair(Address.fromString(token0.id), Address.fromString(token1.id))
+  let pairAddress = factoryContract.pools(Address.fromString(token0.id), Address.fromString(token1.id))
   let pair = Pair.load(pairAddress.toHexString())
 
   // if only 1 LP, require high minimum reserve amount amount or return 0

@@ -1,7 +1,7 @@
 import { PairHourData } from './../types/schema'
 /* eslint-disable prefer-const */
 import { BigInt, BigDecimal, EthereumEvent } from '@graphprotocol/graph-ts'
-import { Pair, Bundle, Token, UniswapFactory, UniswapDayData, PairDayData, TokenDayData } from '../types/schema'
+import { Pair, Bundle, Token, MooniswapFactory, MooniswapDayData, PairDayData, TokenDayData } from '../types/schema'
 import { ONE_BI, ZERO_BD, ZERO_BI, FACTORY_ADDRESS } from './helpers'
 
 // max number of entities to store
@@ -9,13 +9,13 @@ const maxTokenDayDatas = 10
 const maxPairDayDatas = 10
 
 export function updateUniswapDayData(event: EthereumEvent): void {
-  let uniswap = UniswapFactory.load(FACTORY_ADDRESS)
+  let uniswap = MooniswapFactory.load(FACTORY_ADDRESS)
   let timestamp = event.block.timestamp.toI32()
   let dayID = timestamp / 86400
   let dayStartTimestamp = dayID * 86400
-  let uniswapDayData = UniswapDayData.load(dayID.toString())
+  let uniswapDayData = MooniswapDayData.load(dayID.toString())
   if (uniswapDayData == null) {
-    let uniswapDayData = new UniswapDayData(dayID.toString())
+    let uniswapDayData = new MooniswapDayData(dayID.toString())
     uniswapDayData.date = dayStartTimestamp
     uniswapDayData.dailyVolumeUSD = ZERO_BD
     uniswapDayData.dailyVolumeETH = ZERO_BD
@@ -28,7 +28,7 @@ export function updateUniswapDayData(event: EthereumEvent): void {
     uniswapDayData.txCount = ZERO_BI
     uniswapDayData.save()
   }
-  uniswapDayData = UniswapDayData.load(dayID.toString())
+  uniswapDayData = MooniswapDayData.load(dayID.toString())
   uniswapDayData.totalLiquidityUSD = uniswap.totalLiquidityUSD
   uniswapDayData.totalLiquidityETH = uniswap.totalLiquidityETH
   uniswapDayData.txCount = uniswap.txCount
