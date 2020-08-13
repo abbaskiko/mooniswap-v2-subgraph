@@ -8,7 +8,7 @@ import { ONE_BI, ZERO_BD, ZERO_BI, FACTORY_ADDRESS } from './helpers'
 const maxTokenDayDatas = 10
 const maxPairDayDatas = 10
 
-export function updateUniswapDayData(event: EthereumEvent): void {
+export function updateMooniswapDayData(event: EthereumEvent): void {
   let mooniswap = MooniswapFactory.load(FACTORY_ADDRESS)
   let timestamp = event.block.timestamp.toI32()
   let dayID = timestamp / 86400

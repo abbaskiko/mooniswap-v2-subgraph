@@ -1,6 +1,6 @@
 /* eslint-disable prefer-const */
 import { Address, BigDecimal, BigInt } from '@graphprotocol/graph-ts'
-import { updatePairDayData, updatePairHourData, updateTokenDayData, updateUniswapDayData } from './dayUpdates'
+import { updatePairDayData, updatePairHourData, updateTokenDayData, updateMooniswapDayData } from './dayUpdates'
 import { getTrackedVolumeUSD } from './pricing'
 import {
   ADDRESS_ZERO,
@@ -268,11 +268,11 @@ export function handleMint(event: Deposited): void {
   mint.amountUSD = amountTotalUSD as BigDecimal
   mint.save()
 
-  // update day entities
   handleSync(Address.fromString(pair.id))
+  // update day entities
   updatePairDayData(event)
   updatePairHourData(event)
-  updateUniswapDayData(event)
+  updateMooniswapDayData(event)
   updateTokenDayData(token0 as Token, event)
   updateTokenDayData(token1 as Token, event)
 }
@@ -326,11 +326,11 @@ export function handleBurn(event: Withdrawn): void {
   burn.amountUSD = amountTotalUSD as BigDecimal
   burn.save()
 
-  // update day entities
   handleSync(Address.fromString(pair.id))
+  // update day entities
   updatePairDayData(event)
   updatePairHourData(event)
-  updateUniswapDayData(event)
+  updateMooniswapDayData(event)
   updateTokenDayData(token0 as Token, event)
   updateTokenDayData(token1 as Token, event)
 }
@@ -377,7 +377,7 @@ export function handleSwap(event: Swapped): void {
     token0.tradeVolume = token0.tradeVolume.plus(amountSrc)
   } else {
     token0.totalLiquidity = token0.totalLiquidity.minus(amountDest)
-    token0.tradeVolume = token0.tradeVolume.minus(amountDest)
+    token0.tradeVolume = token0.tradeVolume.plus(amountDest)
   }
   token0.tradeVolumeUSD = token0.tradeVolumeUSD.plus(trackedAmountUSD === ZERO_BD ? derivedAmountUSD : trackedAmountUSD)
 
@@ -387,7 +387,7 @@ export function handleSwap(event: Swapped): void {
     token1.tradeVolume = token1.tradeVolume.plus(amountSrc)
   } else {
     token1.totalLiquidity = token1.totalLiquidity.minus(amountDest)
-    token1.tradeVolume = token1.tradeVolume.minus(amountDest)
+    token1.tradeVolume = token1.tradeVolume.plus(amountDest)
   }
   token1.tradeVolumeUSD = token1.tradeVolumeUSD.plus(trackedAmountUSD === ZERO_BD ? derivedAmountUSD : trackedAmountUSD)
 
@@ -451,11 +451,26 @@ export function handleSwap(event: Swapped): void {
   transaction.swaps = swaps
   transaction.save()
 
+  if (swap.referral.toHexString() != ADDRESS_ZERO) {
+    let pairContract = PairContract.bind(event.address)
+    let newTotalSupply = pairContract.totalSupply()
+    let referral = createLiquidityPosition(event.address, event.params.referral)
+    referral.liquidityTokenBalance = convertTokenToDecimal(pairContract.balanceOf(event.params.referral), BI_18)
+    if (newTotalSupply == BigInt.fromI32(0)) {
+      referral.poolOwnership = BigDecimal.fromString('0.0')
+    } else {
+      referral.poolOwnership = referral.liquidityTokenBalance.div(
+        convertTokenToDecimal(newTotalSupply, BI_18)
+      )
+    }
+    referral.save()
+  }
+
   handleSync(Address.fromString(pair.id))
   // update day entities
   updatePairDayData(event)
   updatePairHourData(event)
-  updateUniswapDayData(event)
+  updateMooniswapDayData(event)
   updateTokenDayData(token0 as Token, event)
   updateTokenDayData(token1 as Token, event)
 
