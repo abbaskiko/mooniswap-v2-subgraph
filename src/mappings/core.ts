@@ -1,5 +1,5 @@
 /* eslint-disable prefer-const */
-import { Address, BigDecimal, BigInt, log } from '@graphprotocol/graph-ts'
+import { Address, BigDecimal, BigInt } from '@graphprotocol/graph-ts'
 import { updatePairDayData, updatePairHourData, updateTokenDayData, updateMooniswapDayData } from './dayUpdates'
 import { getTrackedVolumeUSD } from './pricing'
 import {
@@ -7,12 +7,12 @@ import {
   BI_18, calculateFormula,
   convertTokenToDecimal,
   createLiquidityPosition,
-  createUser, EXP_18,
+  createUser,
   FACTORY_ADDRESS,
-  fetchReserves, fetchTokenTotalSupply,
-  handleSync, invariantRatio, ONE_BD,
-  ONE_BI, sqrtBN,
-  ZERO_BD, ZERO_BI
+  fetchReserves,
+  handleSync, ONE_BD,
+  ONE_BI,
+  ZERO_BD
 } from './helpers'
 import { Transfer } from '../types/Factory/ERC20'
 import {
@@ -29,10 +29,6 @@ import {
   Transaction
 } from '../types/schema'
 import { Deposited, Pair as PairContract, Swapped, Withdrawn } from '../types/templates/Pair/Pair'
-
-function isCompleteMint(mintId: string): boolean {
-  return Mint.load(mintId).sender !== null // sufficient checks
-}
 
 export function handleTransfer(event: Transfer): void {
 
@@ -416,11 +412,13 @@ export function handleSwap(event: Swapped): void {
     event.params.amount
   )
   let winInFee = returnAmountWithoutVirtualBalances.minus(event.params.result)
-  let lpExtraFee = convertTokenToDecimal(winInFee, isFirstAmount0 ? token1.decimals : token0.decimals)
+  let lpExtraFee = winInFee.isZero()
+    ? ZERO_BD
+    : convertTokenToDecimal(winInFee, isFirstAmount0 ? token1.decimals : token0.decimals)
   if (isFirstAmount0) {
-    pair.lpFeeInToken1 = pair.lpFeeInToken1.plus(lpExtraFee)
+    pair.lpExtraFeeInToken1 = pair.lpExtraFeeInToken1.plus(lpExtraFee)
   } else {
-    pair.lpFeeInToken0 = pair.lpFeeInToken0.plus(lpExtraFee)
+    pair.lpExtraFeeInToken0 = pair.lpExtraFeeInToken0.plus(lpExtraFee)
   }
 
   // save entities
@@ -446,12 +444,14 @@ export function handleSwap(event: Swapped): void {
       .concat('-')
       .concat(BigInt.fromI32(swaps.length).toString())
   )
+  swap.lpExtraFeeInToken0 = ZERO_BD
+  swap.lpExtraFeeInToken1 = ZERO_BD
 
   // update swap event
   if (isFirstAmount0) {
-    swap.lpFeeInToken1 = swap.lpFeeInToken1.plus(lpExtraFee)
+    swap.lpExtraFeeInToken1 = swap.lpExtraFeeInToken1.plus(lpExtraFee)
   } else {
-    swap.lpFeeInToken0 = swap.lpFeeInToken0.plus(lpExtraFee)
+    swap.lpExtraFeeInToken0 = swap.lpExtraFeeInToken0.plus(lpExtraFee)
   }
   swap.pair = pair.id
   swap.timestamp = transaction.timestamp

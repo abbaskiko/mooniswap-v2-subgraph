@@ -18,7 +18,6 @@ export let ONE_BI = BigInt.fromI32(1)
 export let ZERO_BD = BigDecimal.fromString('0')
 export let ONE_BD = BigDecimal.fromString('1')
 export let BI_18 = BigInt.fromI32(18)
-export let invariantRatio = BigInt.fromI32(10).pow(36)
 export let EXP_18 = BigInt.fromI32(10).pow(18)
 let fee = (BigInt.fromI32(10).pow(15)).times(BigInt.fromI32(3))
 

@@ -110,8 +110,8 @@ export function handleNewPair(event: Deployed): void {
   pair.volumeUSD = ZERO_BD
   pair.token0Price = ZERO_BD
   pair.token1Price = ZERO_BD
-  pair.lpFeeInToken0 = ZERO_BD
-  pair.lpFeeInToken1 = ZERO_BD
+  pair.lpExtraFeeInToken0 = ZERO_BD
+  pair.lpExtraFeeInToken1 = ZERO_BD
 
   // update factory totals
   let factoryPairs = factory.pairs
