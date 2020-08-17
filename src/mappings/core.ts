@@ -10,7 +10,7 @@ import {
   createUser, EXP_18,
   FACTORY_ADDRESS,
   fetchReserves, fetchTokenTotalSupply,
-  handleSync, invariantRatio,
+  handleSync, invariantRatio, ONE_BD,
   ONE_BI, sqrtBN,
   ZERO_BD, ZERO_BI
 } from './helpers'
@@ -474,41 +474,11 @@ export function handleSwap(event: Swapped): void {
     }
     referral.save()
 
-    // log.debug('pair: ' + event.transaction.hash.toHexString() + ' ' + 'totalSupply: ' + event.params.totalSupply.toString() + ' pairTotalSupply: ' + pair.totalSupply.toString() , [])
-
-    // uint256 invariantRatio = uint256(1e36);
-    // invariantRatio = invariantRatio.mul(balances.src.add(confirmed)).div(balances.src);
-    // invariantRatio = invariantRatio.mul(balances.dst.sub(result)).div(balances.dst);
-    // if (invariantRatio > 1e36) {
-    //   // calculate share only if invariant increased
-    //   uint256 referralShare = invariantRatio.sqrt().sub(1e18).mul(totalSupply()).div(1e18).div(REFERRAL_SHARE);
-    //   if (referralShare > 0) {
-    //     _mint(referral, referralShare);
-    //   }
-    // }
-    let balanceSrc = event.params.srcBalance
-    let balanceDest = event.params.dstBalance
-    let invRat = invariantRatio.times(balanceSrc.plus(event.params.amount)).div(balanceSrc)
-    let invRatRecalced = invRat.times(balanceDest.minus(event.params.result)).div(balanceDest)
-    if (invRatRecalced.gt(invariantRatio)) {
-      let REFERRAL_SHARE = BigInt.fromI32(20)
-      let totalSupply = event.params.totalSupply
-      log.debug('pair: ' + event.transaction.hash.toHexString() + ' ' + 'totalSupply: ' + totalSupply.toString(), [])
-      let sqrtRoot = sqrtBN(invRatRecalced).minus(EXP_18);
-      // let referralShare = sqrtRoot.toBigDecimal().times(totalSupply)
-      //   .div(EXP_18.toBigDecimal()).truncate(18)
-      //   .div(REFERRAL_SHARE).truncate(18)
-
-      // todo: more precision
-      let referralShare = sqrtRoot.times(totalSupply)
-        .div(
-          sqrtRoot
-            .plus(EXP_18)
-            .times(REFERRAL_SHARE)
-        )
-
-      if (referralShare.gt(ZERO_BI)) {
-        swap.referralReward = referralShare.toBigDecimal().div(EXP_18.toBigDecimal()).truncate(18)
+    let mints = transaction.mints
+    if (mints.length > 0) {
+      let mint = Mint.load(mints[mints.length - 1].toString())
+      if (mint.amount0 === ONE_BD && mint.amount1 === ONE_BD) {
+        swap.referralReward = mint.liquidity
       }
     }
   }
