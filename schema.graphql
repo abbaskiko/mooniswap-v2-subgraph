@@ -78,6 +78,7 @@ type Pair @entity {
   volumeToken0: BigDecimal!
   volumeToken1: BigDecimal!
   volumeUSD: BigDecimal!
+  lpFeesUSD: BigDecimal!
   txCount: BigInt!
 
   # creation stats

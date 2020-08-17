@@ -409,6 +409,22 @@ export function handleSwap(event: Swapped): void {
   mooniswap.totalVolumeETH = mooniswap.totalVolumeETH.plus(trackedAmountETH)
   mooniswap.txCount = mooniswap.txCount.plus(ONE_BI)
 
+
+  let returnAmountWithoutVirtualBalances = calculateFormula(
+    event.params.srcBalance,
+    event.params.dstBalance,
+    event.params.amount
+  )
+  let winInFee = returnAmountWithoutVirtualBalances.minus(event.params.result)
+  let derivedEth = isFirstAmount0 ? token1.derivedETH : token0.derivedETH
+  let usdPrice = derivedEth.times(bundle.ethPrice)
+  let lpFeeUsd = convertTokenToDecimal(
+    winInFee,
+    isFirstAmount0 ? token1.decimals : token0.decimals
+  ).times(usdPrice)
+
+  pair.lpFeesUSD = pair.lpFeesUSD.plus(lpFeeUsd)
+
   // save entities
   pair.save()
   token0.save()
@@ -433,20 +449,8 @@ export function handleSwap(event: Swapped): void {
       .concat(BigInt.fromI32(swaps.length).toString())
   )
 
-  let returnAmountWithoutVirtualBalances = calculateFormula(
-      event.params.srcBalance,
-      event.params.dstBalance,
-      event.params.amount
-  )
-  let winInFee = returnAmountWithoutVirtualBalances.minus(event.params.result)
-  let derivedEth = isFirstAmount0 ? token1.derivedETH : token0.derivedETH
-  let usdPrice = derivedEth.times(bundle.ethPrice)
-
   // update swap event
-  swap.lpFee = convertTokenToDecimal(
-    winInFee,
-    isFirstAmount0 ? token1.decimals : token0.decimals
-  ).times(usdPrice)
+  swap.lpFee = lpFeeUsd
   swap.pair = pair.id
   swap.timestamp = transaction.timestamp
   swap.sender = event.params.account
