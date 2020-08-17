@@ -183,7 +183,11 @@ type Swap @entity {
   destAmount: BigDecimal!
   src: Bytes!  # token address
   dest: Bytes! # token address
+
   referral: Bytes! # referral address
+  referralReward: BigDecimal!
+
+  lpFee: BigDecimal!
 
   logIndex: BigInt
 
@@ -198,7 +202,7 @@ type Bundle @entity {
   # daiPrice: BigDecimal! # price of ETH in DAI
 }
 
-# Data accumulated and condensed into day stats for all of Uniswap
+# Data accumulated and condensed into day stats for all of Mooniswap
 type MooniswapDayData @entity {
   id: ID! # timestamp rounded to current day by dividing by 86400
   date: Int!

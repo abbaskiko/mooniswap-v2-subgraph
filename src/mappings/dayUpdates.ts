@@ -13,26 +13,26 @@ export function updateMooniswapDayData(event: EthereumEvent): void {
   let timestamp = event.block.timestamp.toI32()
   let dayID = timestamp / 86400
   let dayStartTimestamp = dayID * 86400
-  let uniswapDayData = MooniswapDayData.load(dayID.toString())
-  if (uniswapDayData == null) {
-    let uniswapDayData = new MooniswapDayData(dayID.toString())
-    uniswapDayData.date = dayStartTimestamp
-    uniswapDayData.dailyVolumeUSD = ZERO_BD
-    uniswapDayData.dailyVolumeETH = ZERO_BD
-    uniswapDayData.totalVolumeUSD = ZERO_BD
-    uniswapDayData.totalVolumeETH = ZERO_BD
-    uniswapDayData.totalLiquidityUSD = ZERO_BD
-    uniswapDayData.totalLiquidityETH = ZERO_BD
-    uniswapDayData.maxStored = maxTokenDayDatas
-    uniswapDayData.mostLiquidTokens = mooniswap.mostLiquidTokens
-    uniswapDayData.txCount = ZERO_BI
-    uniswapDayData.save()
+  let mooniswapDayData = MooniswapDayData.load(dayID.toString())
+  if (mooniswapDayData == null) {
+    let mooniswapDayData = new MooniswapDayData(dayID.toString())
+    mooniswapDayData.date = dayStartTimestamp
+    mooniswapDayData.dailyVolumeUSD = ZERO_BD
+    mooniswapDayData.dailyVolumeETH = ZERO_BD
+    mooniswapDayData.totalVolumeUSD = ZERO_BD
+    mooniswapDayData.totalVolumeETH = ZERO_BD
+    mooniswapDayData.totalLiquidityUSD = ZERO_BD
+    mooniswapDayData.totalLiquidityETH = ZERO_BD
+    mooniswapDayData.maxStored = maxTokenDayDatas
+    mooniswapDayData.mostLiquidTokens = mooniswap.mostLiquidTokens
+    mooniswapDayData.txCount = ZERO_BI
+    mooniswapDayData.save()
   }
-  uniswapDayData = MooniswapDayData.load(dayID.toString())
-  uniswapDayData.totalLiquidityUSD = mooniswap.totalLiquidityUSD
-  uniswapDayData.totalLiquidityETH = mooniswap.totalLiquidityETH
-  uniswapDayData.txCount = mooniswap.txCount
-  uniswapDayData.save()
+  mooniswapDayData = MooniswapDayData.load(dayID.toString())
+  mooniswapDayData.totalLiquidityUSD = mooniswap.totalLiquidityUSD
+  mooniswapDayData.totalLiquidityETH = mooniswap.totalLiquidityETH
+  mooniswapDayData.txCount = mooniswap.txCount
+  mooniswapDayData.save()
 }
 
 export function updatePairDayData(event: EthereumEvent): void {

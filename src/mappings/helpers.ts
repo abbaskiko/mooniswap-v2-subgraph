@@ -1,10 +1,10 @@
 /* eslint-disable prefer-const */
-import { log, BigInt, BigDecimal, Address } from '@graphprotocol/graph-ts'
+import { Address, BigDecimal, BigInt, log } from '@graphprotocol/graph-ts'
 import { ERC20 } from '../types/Factory/ERC20'
 import { ERC20 as ERC20Telmplate } from '../types/templates/Pair/ERC20'
 import { ERC20SymbolBytes } from '../types/Factory/ERC20SymbolBytes'
 import { ERC20NameBytes } from '../types/Factory/ERC20NameBytes'
-import { User, LiquidityPosition, Pair, Token, MooniswapFactory, Bundle } from '../types/schema'
+import { Bundle, LiquidityPosition, MooniswapFactory, Pair, Token, User } from '../types/schema'
 import { Factory as FactoryContract } from '../types/templates/Pair/Factory'
 import { findEthPerToken, getEthPriceInUSD, getTrackedLiquidityUSD } from './pricing'
 
@@ -18,6 +18,9 @@ export let ONE_BI = BigInt.fromI32(1)
 export let ZERO_BD = BigDecimal.fromString('0')
 export let ONE_BD = BigDecimal.fromString('1')
 export let BI_18 = BigInt.fromI32(18)
+export let invariantRatio = BigInt.fromI32(10).pow(36)
+export let EXP_18 = BigInt.fromI32(10).pow(18)
+let fee = (BigInt.fromI32(10).pow(15)).times(BigInt.fromI32(3))
 
 export let factoryContract = FactoryContract.bind(Address.fromString(FACTORY_ADDRESS))
 
@@ -178,6 +181,13 @@ export function fetchReserves(pairAddress: string): Array<BigInt> {
   return [reserve0.value, reserve1.value]
 }
 
+// export function fetchVirtualReserves(pairAddress: string, srcToken: string, dstToken: string): Array<BigInt> {
+//   let contract = PairContract.bind(Address.fromString(pairAddress))
+//   let srcAddition = contract.try_getBalanceForAddition(Address.fromString(srcToken))
+//   let destRemoval = contract.try_getBalanceForAddition(Address.fromString(dstToken))
+//   return [srcAddition.value, destRemoval.value]
+// }
+
 export function handleSync(pairAddress: Address): void {
   let pair = Pair.load(pairAddress.toHex())
   let token0 = Token.load(pair.token0)
@@ -228,4 +238,27 @@ export function handleSync(pairAddress: Address): void {
   // save entities
   pair.save()
   mooniswap.save()
+}
+
+export function calculateFormula(balA: BigInt, balB: BigInt, amount: BigInt): BigInt {
+  let taxedAmount = amount.minus(amount.times(fee).div(EXP_18))
+  return taxedAmount.times(balB).div(balA.plus(taxedAmount))
+}
+
+export function sqrtBN(val: BigInt): BigInt {
+
+  let z = ZERO_BI
+
+  if (val.gt(BigInt.fromI32(3))) {
+    z = val
+    let x = val.div(BigInt.fromI32(2)).plus(BigInt.fromI32(1))
+    while (x.lt(z)) {
+      z = x
+      x = (val.div(x).plus(x)).div(BigInt.fromI32(2))
+    }
+  } else if (!val.isZero()) {
+    z = BigInt.fromI32(1)
+  }
+
+  return z
 }

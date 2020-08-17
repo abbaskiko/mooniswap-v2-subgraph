@@ -1,18 +1,18 @@
 /* eslint-disable prefer-const */
-import { Address, BigDecimal, BigInt } from '@graphprotocol/graph-ts'
+import { Address, BigDecimal, BigInt, log } from '@graphprotocol/graph-ts'
 import { updatePairDayData, updatePairHourData, updateTokenDayData, updateMooniswapDayData } from './dayUpdates'
 import { getTrackedVolumeUSD } from './pricing'
 import {
   ADDRESS_ZERO,
-  BI_18,
+  BI_18, calculateFormula,
   convertTokenToDecimal,
   createLiquidityPosition,
-  createUser,
+  createUser, EXP_18,
   FACTORY_ADDRESS,
-  fetchReserves,
-  handleSync,
-  ONE_BI,
-  ZERO_BD
+  fetchReserves, fetchTokenTotalSupply,
+  handleSync, invariantRatio,
+  ONE_BI, sqrtBN,
+  ZERO_BD, ZERO_BI
 } from './helpers'
 import { Transfer } from '../types/Factory/ERC20'
 import {
@@ -339,6 +339,7 @@ export function handleSwap(event: Swapped): void {
   let pair = Pair.load(event.address.toHexString())
   let token0 = Token.load(pair.token0)
   let token1 = Token.load(pair.token1)
+
   let isFirstAmount0 = event.params.src.toHexString() == token0.id
   let amountSrc = convertTokenToDecimal(
     event.params.amount,
@@ -432,7 +433,20 @@ export function handleSwap(event: Swapped): void {
       .concat(BigInt.fromI32(swaps.length).toString())
   )
 
+  let returnAmountWithoutVirtualBalances = calculateFormula(
+      event.params.srcBalance,
+      event.params.dstBalance,
+      event.params.amount
+  )
+  let winInFee = returnAmountWithoutVirtualBalances.minus(event.params.result)
+  let derivedEth = isFirstAmount0 ? token1.derivedETH : token0.derivedETH
+  let usdPrice = derivedEth.times(bundle.ethPrice)
+
   // update swap event
+  swap.lpFee = convertTokenToDecimal(
+    winInFee,
+    isFirstAmount0 ? token1.decimals : token0.decimals
+  ).times(usdPrice)
   swap.pair = pair.id
   swap.timestamp = transaction.timestamp
   swap.sender = event.params.account
@@ -444,12 +458,7 @@ export function handleSwap(event: Swapped): void {
   swap.logIndex = event.logIndex
   // use the tracked amount if we have it
   swap.amountUSD = trackedAmountUSD === ZERO_BD ? derivedAmountUSD : trackedAmountUSD
-  swap.save()
-
-  // update the transaction
-  swaps.push(swap.id)
-  transaction.swaps = swaps
-  transaction.save()
+  swap.referralReward = ZERO_BD
 
   if (swap.referral.toHexString() != ADDRESS_ZERO) {
     let pairContract = PairContract.bind(event.address)
@@ -464,7 +473,53 @@ export function handleSwap(event: Swapped): void {
       )
     }
     referral.save()
+
+    // log.debug('pair: ' + event.transaction.hash.toHexString() + ' ' + 'totalSupply: ' + event.params.totalSupply.toString() + ' pairTotalSupply: ' + pair.totalSupply.toString() , [])
+
+    // uint256 invariantRatio = uint256(1e36);
+    // invariantRatio = invariantRatio.mul(balances.src.add(confirmed)).div(balances.src);
+    // invariantRatio = invariantRatio.mul(balances.dst.sub(result)).div(balances.dst);
+    // if (invariantRatio > 1e36) {
+    //   // calculate share only if invariant increased
+    //   uint256 referralShare = invariantRatio.sqrt().sub(1e18).mul(totalSupply()).div(1e18).div(REFERRAL_SHARE);
+    //   if (referralShare > 0) {
+    //     _mint(referral, referralShare);
+    //   }
+    // }
+    let balanceSrc = event.params.srcBalance
+    let balanceDest = event.params.dstBalance
+    let invRat = invariantRatio.times(balanceSrc.plus(event.params.amount)).div(balanceSrc)
+    let invRatRecalced = invRat.times(balanceDest.minus(event.params.result)).div(balanceDest)
+    if (invRatRecalced.gt(invariantRatio)) {
+      let REFERRAL_SHARE = BigInt.fromI32(20)
+      let totalSupply = event.params.totalSupply
+      log.debug('pair: ' + event.transaction.hash.toHexString() + ' ' + 'totalSupply: ' + totalSupply.toString(), [])
+      let sqrtRoot = sqrtBN(invRatRecalced).minus(EXP_18);
+      // let referralShare = sqrtRoot.toBigDecimal().times(totalSupply)
+      //   .div(EXP_18.toBigDecimal()).truncate(18)
+      //   .div(REFERRAL_SHARE).truncate(18)
+
+      // todo: more precision
+      let referralShare = sqrtRoot.times(totalSupply)
+        .div(
+          sqrtRoot
+            .plus(EXP_18)
+            .times(REFERRAL_SHARE)
+        )
+
+      if (referralShare.gt(ZERO_BI)) {
+        swap.referralReward = referralShare.toBigDecimal().div(EXP_18.toBigDecimal()).truncate(18)
+      }
+    }
   }
+
+  swap.save()
+
+  // update the transaction
+  swaps.push(swap.id)
+  transaction.swaps = swaps
+  transaction.save()
+
 
   handleSync(Address.fromString(pair.id))
   // update day entities
@@ -483,10 +538,10 @@ export function handleSwap(event: Swapped): void {
     .concat(BigInt.fromI32(dayID).toString())
 
   // swap specific updating
-  let uniswapDayData = MooniswapDayData.load(dayID.toString())
-  uniswapDayData.dailyVolumeUSD = uniswapDayData.dailyVolumeUSD.plus(trackedAmountUSD)
-  uniswapDayData.dailyVolumeETH = uniswapDayData.dailyVolumeETH.plus(trackedAmountETH)
-  uniswapDayData.save()
+  let mooniswapDayData = MooniswapDayData.load(dayID.toString())
+  mooniswapDayData.dailyVolumeUSD = mooniswapDayData.dailyVolumeUSD.plus(trackedAmountUSD)
+  mooniswapDayData.dailyVolumeETH = mooniswapDayData.dailyVolumeETH.plus(trackedAmountETH)
+  mooniswapDayData.save()
 
   // swap specific updating for pair
   let pairDayData = PairDayData.load(dayPairID)
