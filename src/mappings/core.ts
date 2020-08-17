@@ -416,14 +416,12 @@ export function handleSwap(event: Swapped): void {
     event.params.amount
   )
   let winInFee = returnAmountWithoutVirtualBalances.minus(event.params.result)
-  let derivedEth = isFirstAmount0 ? token1.derivedETH : token0.derivedETH
-  let usdPrice = derivedEth.times(bundle.ethPrice)
-  let lpFeeUsd = convertTokenToDecimal(
-    winInFee,
-    isFirstAmount0 ? token1.decimals : token0.decimals
-  ).times(usdPrice)
-
-  pair.lpFeesUSD = pair.lpFeesUSD.plus(lpFeeUsd)
+  let lpExtraFee = convertTokenToDecimal(winInFee, isFirstAmount0 ? token1.decimals : token0.decimals)
+  if (isFirstAmount0) {
+    pair.lpFeeInToken1 = pair.lpFeeInToken1.plus(lpExtraFee)
+  } else {
+    pair.lpFeeInToken0 = pair.lpFeeInToken0.plus(lpExtraFee)
+  }
 
   // save entities
   pair.save()
@@ -450,7 +448,11 @@ export function handleSwap(event: Swapped): void {
   )
 
   // update swap event
-  swap.lpFee = lpFeeUsd
+  if (isFirstAmount0) {
+    swap.lpFeeInToken1 = swap.lpFeeInToken1.plus(lpExtraFee)
+  } else {
+    swap.lpFeeInToken0 = swap.lpFeeInToken0.plus(lpExtraFee)
+  }
   swap.pair = pair.id
   swap.timestamp = transaction.timestamp
   swap.sender = event.params.account

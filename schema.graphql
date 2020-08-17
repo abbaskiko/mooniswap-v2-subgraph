@@ -78,8 +78,9 @@ type Pair @entity {
   volumeToken0: BigDecimal!
   volumeToken1: BigDecimal!
   volumeUSD: BigDecimal!
-  lpFeesUSD: BigDecimal!
   txCount: BigInt!
+  lpFeeInToken0: BigDecimal!
+  lpFeeInToken1: BigDecimal!
 
   # creation stats
   createdAtTimestamp: BigInt!
@@ -188,7 +189,8 @@ type Swap @entity {
   referral: Bytes! # referral address
   referralReward: BigDecimal!
 
-  lpFee: BigDecimal!
+  lpFeeInToken0: BigDecimal!
+  lpFeeInToken1: BigDecimal!
 
   logIndex: BigInt
 
