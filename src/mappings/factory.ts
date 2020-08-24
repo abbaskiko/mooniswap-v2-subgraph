@@ -23,6 +23,7 @@ export function handleNewPair(event: Deployed): void {
     factory.totalVolumeETH = ZERO_BD
     factory.totalLiquidityETH = ZERO_BD
     factory.totalVolumeUSD = ZERO_BD
+    factory.untrackedVolumeUSD = ZERO_BD
     factory.totalLiquidityUSD = ZERO_BD
     factory.txCount = ZERO_BI
     factory.mostLiquidTokens = []
@@ -56,8 +57,9 @@ export function handleNewPair(event: Deployed): void {
     token0.derivedETH = ZERO_BD
     token0.tradeVolume = ZERO_BD
     token0.tradeVolumeUSD = ZERO_BD
+    token0.untrackedVolumeUSD = ZERO_BD
     token0.totalLiquidity = ZERO_BD
-    token0.allPairs = []
+    // token0.allPairs = []
     token0.mostLiquidPairs = []
     token0.txCount = ZERO_BI
   }
@@ -79,23 +81,17 @@ export function handleNewPair(event: Deployed): void {
     token1.derivedETH = ZERO_BD
     token1.tradeVolume = ZERO_BD
     token1.tradeVolumeUSD = ZERO_BD
+    token1.untrackedVolumeUSD = ZERO_BD
     token1.totalLiquidity = ZERO_BD
-    token1.allPairs = []
+    // token1.allPairs = []
     token1.mostLiquidPairs = []
     token1.txCount = ZERO_BI
   }
 
-  let newAllPairsArray0 = token0.allPairs
-  newAllPairsArray0.push(event.params.mooniswap.toHexString())
-  token0.allPairs = newAllPairsArray0
-
-  let newAllPairsArray1 = token1.allPairs
-  newAllPairsArray1.push(event.params.mooniswap.toHexString())
-  token1.allPairs = newAllPairsArray1
-
   let pair = new Pair(event.params.mooniswap.toHexString()) as Pair
   pair.token0 = token0.id
   pair.token1 = token1.id
+  pair.liquidityProviderCount = ZERO_BI
   pair.createdAtTimestamp = event.block.timestamp
   pair.createdAtBlockNumber = event.block.number
   pair.txCount = ZERO_BI
@@ -108,15 +104,11 @@ export function handleNewPair(event: Deployed): void {
   pair.volumeToken0 = ZERO_BD
   pair.volumeToken1 = ZERO_BD
   pair.volumeUSD = ZERO_BD
+  pair.untrackedVolumeUSD = ZERO_BD
   pair.token0Price = ZERO_BD
   pair.token1Price = ZERO_BD
   pair.lpExtraFeeInToken0 = ZERO_BD
   pair.lpExtraFeeInToken1 = ZERO_BD
-
-  // update factory totals
-  let factoryPairs = factory.pairs
-  factoryPairs.push(pair.id)
-  factory.pairs = factoryPairs
 
   // create the tracked contract based on the template
   PairTemplate.create(event.params.mooniswap)

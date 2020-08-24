@@ -6,7 +6,7 @@
   "scripts": {
     "codegen": "graph codegen --output-dir src/types/",
     "build": "graph build",
-    "deploy": "graph deploy krboktv/try-second-graph --ipfs https://api.thegraph.com/ipfs/ --node https://api.thegraph.com/deploy/ --debug"
+    "deploy": "graph deploy krboktv/mooniswap --ipfs https://api.thegraph.com/ipfs/ --node https://api.thegraph.com/deploy/ --debug"
   },
   "devDependencies": {
     "@graphprotocol/graph-cli": "^0.16.0",

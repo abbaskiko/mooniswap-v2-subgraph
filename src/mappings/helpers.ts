@@ -1,10 +1,18 @@
 /* eslint-disable prefer-const */
-import { Address, BigDecimal, BigInt, log } from '@graphprotocol/graph-ts'
+import { Address, BigDecimal, BigInt, log, EthereumEvent } from '@graphprotocol/graph-ts'
 import { ERC20 } from '../types/Factory/ERC20'
 import { ERC20 as ERC20Telmplate } from '../types/templates/Pair/ERC20'
 import { ERC20SymbolBytes } from '../types/Factory/ERC20SymbolBytes'
 import { ERC20NameBytes } from '../types/Factory/ERC20NameBytes'
-import { Bundle, LiquidityPosition, MooniswapFactory, Pair, Token, User } from '../types/schema'
+import {
+  Bundle,
+  LiquidityPosition,
+  LiquidityPositionSnapshot,
+  MooniswapFactory,
+  Pair,
+  Token,
+  User
+} from '../types/schema'
 import { Factory as FactoryContract } from '../types/templates/Pair/Factory'
 import { findEthPerToken, getEthPriceInUSD, getTrackedLiquidityUSD } from './pricing'
 
@@ -33,10 +41,6 @@ export function exponentToBigDecimal(decimals: BigInt): BigDecimal {
 
 export function bigDecimalExp18(): BigDecimal {
   return BigDecimal.fromString('1000000000000000000')
-}
-
-export function convertEthToDecimal(eth: BigInt): BigDecimal {
-  return eth.toBigDecimal().div(exponentToBigDecimal(18))
 }
 
 export function convertTokenToDecimal(tokenAmount: BigInt, exchangeDecimals: BigInt): BigDecimal {
@@ -150,14 +154,46 @@ export function createLiquidityPosition(exchange: Address, user: Address): Liqui
     .concat(user.toHexString())
   let liquidityTokenBalance = LiquidityPosition.load(id)
   if (liquidityTokenBalance === null) {
+    let pair = Pair.load(exchange.toHexString())
+    pair.liquidityProviderCount = pair.liquidityProviderCount.plus(ONE_BI)
     liquidityTokenBalance = new LiquidityPosition(id)
     liquidityTokenBalance.liquidityTokenBalance = ZERO_BD
     liquidityTokenBalance.pair = exchange.toHexString()
     liquidityTokenBalance.user = user.toHexString()
+    liquidityTokenBalance.historicalSnapshots = []
     liquidityTokenBalance.save()
   }
   if (liquidityTokenBalance == null) log.error('LiquidityTokenBalance is null', [id])
   return liquidityTokenBalance as LiquidityPosition
+}
+
+export function createLiquiditySnapshot(position: LiquidityPosition, event: EthereumEvent): void {
+  let timestamp = event.block.timestamp.toI32()
+  let bundle = Bundle.load('1')
+  let pair = Pair.load(position.pair)
+  let token0 = Token.load(pair.token0)
+  let token1 = Token.load(pair.token1)
+
+  // create new snapshot
+  let snapshot = new LiquidityPositionSnapshot(position.id.concat(timestamp.toString()))
+  snapshot.timestamp = timestamp
+  snapshot.block = event.block.number.toI32()
+  snapshot.user = position.user
+  snapshot.pair = position.pair
+  snapshot.token0PriceUSD = token0.derivedETH.times(bundle.ethPrice)
+  snapshot.token1PriceUSD = token1.derivedETH.times(bundle.ethPrice)
+  snapshot.reserve0 = pair.reserve0
+  snapshot.reserve1 = pair.reserve1
+  snapshot.reserveUSD = pair.reserveUSD
+  snapshot.liquidityTokenTotalSupply = pair.totalSupply
+  snapshot.liquidityTokenBalance = position.liquidityTokenBalance
+  snapshot.save()
+
+  // add snapshot to lqiudiity position array
+  let snapshots = position.historicalSnapshots
+  snapshots.push(snapshot.id)
+  position.historicalSnapshots = snapshots
+  position.save()
 }
 
 export function createUser(address: Address): void {
@@ -197,6 +233,10 @@ export function handleSync(pairAddress: Address): void {
   // reset factory liquidity by subtracting only tracked liquidity
   mooniswap.totalLiquidityETH = mooniswap.totalLiquidityETH.minus(pair.trackedReserveETH as BigDecimal)
 
+  // reset token total liquidity amounts
+  token0.totalLiquidity = token0.totalLiquidity.minus(pair.reserve0)
+  token1.totalLiquidity = token1.totalLiquidity.minus(pair.reserve1)
+
   pair.reserve0 = convertTokenToDecimal(reserves[0], token0.decimals)
   pair.reserve1 = convertTokenToDecimal(reserves[1], token1.decimals)
   pair.token0Price = pair.reserve0.div(pair.reserve1)
@@ -208,8 +248,8 @@ export function handleSync(pairAddress: Address): void {
   bundle.ethPrice = getEthPriceInUSD()
   bundle.save()
 
-  token0.derivedETH = findEthPerToken(token0 as Token, false)
-  token1.derivedETH = findEthPerToken(token1 as Token, false)
+  token0.derivedETH = findEthPerToken(token0 as Token)
+  token1.derivedETH = findEthPerToken(token1 as Token)
   token0.save()
   token1.save()
 
@@ -233,6 +273,10 @@ export function handleSync(pairAddress: Address): void {
   // use tracked amounts globally
   mooniswap.totalLiquidityETH = mooniswap.totalLiquidityETH.plus(trackedLiquidityETH)
   mooniswap.totalLiquidityUSD = mooniswap.totalLiquidityETH.times(bundle.ethPrice)
+
+  // now correctly set liquidity amounts for each token
+  token0.totalLiquidity = token0.totalLiquidity.plus(pair.reserve0)
+  token1.totalLiquidity = token1.totalLiquidity.plus(pair.reserve1)
 
   // save entities
   pair.save()

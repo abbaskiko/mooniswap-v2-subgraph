@@ -6,7 +6,7 @@ import {
   ADDRESS_ZERO,
   BI_18, calculateFormula,
   convertTokenToDecimal,
-  createLiquidityPosition,
+  createLiquidityPosition, createLiquiditySnapshot,
   createUser,
   FACTORY_ADDRESS,
   fetchReserves,
@@ -22,7 +22,7 @@ import {
   MooniswapDayData,
   MooniswapFactory,
   Pair,
-  PairDayData,
+  PairDayData, PairHourData,
   Swap,
   Token,
   TokenDayData,
@@ -53,7 +53,6 @@ export function handleTransfer(event: Transfer): void {
   }
 
   let pairContract = PairContract.bind(event.address)
-  let newTotalSupply = pairContract.totalSupply()
 
   // liquidity token amount being transfered
   let value = convertTokenToDecimal(event.params.value, BI_18)
@@ -191,27 +190,16 @@ export function handleTransfer(event: Transfer): void {
   if (from.toHexString() != ADDRESS_ZERO && from.toHexString() != pair.id) {
     let fromUserLiquidityPosition = createLiquidityPosition(event.address, from)
     fromUserLiquidityPosition.liquidityTokenBalance = convertTokenToDecimal(pairContract.balanceOf(from), BI_18)
-    if (newTotalSupply == BigInt.fromI32(0)) {
-      fromUserLiquidityPosition.poolOwnership = BigDecimal.fromString('0.0')
-    } else {
-      fromUserLiquidityPosition.poolOwnership = fromUserLiquidityPosition.liquidityTokenBalance.div(
-        convertTokenToDecimal(newTotalSupply, BI_18)
-      )
-    }
+    fromUserLiquidityPosition.save()
+    createLiquiditySnapshot(fromUserLiquidityPosition, event)
     fromUserLiquidityPosition.save()
   }
 
   if (event.params.to.toHexString() != ADDRESS_ZERO && to.toHexString() != pair.id) {
     let toUserLiquidityPosition = createLiquidityPosition(event.address, to)
     toUserLiquidityPosition.liquidityTokenBalance = convertTokenToDecimal(pairContract.balanceOf(to), BI_18)
-    if (newTotalSupply == BigInt.fromI32(0)) {
-      toUserLiquidityPosition.poolOwnership = BigDecimal.fromString('0.0')
-    } else {
-      toUserLiquidityPosition.poolOwnership = toUserLiquidityPosition.liquidityTokenBalance.div(
-        convertTokenToDecimal(newTotalSupply, BI_18)
-      )
-    }
     toUserLiquidityPosition.save()
+    createLiquiditySnapshot(toUserLiquidityPosition, event)
   }
   transaction.save()
 }
@@ -263,6 +251,10 @@ export function handleMint(event: Deposited): void {
   mint.logIndex = event.logIndex
   mint.amountUSD = amountTotalUSD as BigDecimal
   mint.save()
+
+  // update the LP position
+  let liquidityPosition = createLiquidityPosition(event.address, mint.to as Address)
+  createLiquiditySnapshot(liquidityPosition, event)
 
   handleSync(Address.fromString(pair.id))
   // update day entities
@@ -322,6 +314,10 @@ export function handleBurn(event: Withdrawn): void {
   burn.amountUSD = amountTotalUSD as BigDecimal
   burn.save()
 
+  // update the LP position
+  let liquidityPosition = createLiquidityPosition(event.address, burn.sender as Address)
+  createLiquiditySnapshot(liquidityPosition, event)
+
   handleSync(Address.fromString(pair.id))
   // update day entities
   updatePairDayData(event)
@@ -359,7 +355,7 @@ export function handleSwap(event: Swapped): void {
   let derivedAmountUSD = derivedAmountETH.times(bundle.ethPrice)
 
   // only accounts for volume through white listed tokens
-  let trackedAmountUSD = getTrackedVolumeUSD(amount0, token0 as Token, amount1, token1 as Token)
+  let trackedAmountUSD = getTrackedVolumeUSD(amount0, token0 as Token, amount1, token1 as Token, pair as Pair)
 
   let trackedAmountETH: BigDecimal
   if (bundle.ethPrice.equals(ZERO_BD)) {
@@ -376,7 +372,8 @@ export function handleSwap(event: Swapped): void {
     token0.totalLiquidity = token0.totalLiquidity.minus(amountDest)
     token0.tradeVolume = token0.tradeVolume.plus(amountDest)
   }
-  token0.tradeVolumeUSD = token0.tradeVolumeUSD.plus(trackedAmountUSD === ZERO_BD ? derivedAmountUSD : trackedAmountUSD)
+  token0.tradeVolumeUSD = token0.tradeVolumeUSD.plus(trackedAmountUSD)
+  token0.untrackedVolumeUSD = token0.untrackedVolumeUSD.plus(derivedAmountUSD)
 
   // update token1 global volume and token liquidity stats
   if (!isFirstAmount0) {
@@ -386,14 +383,16 @@ export function handleSwap(event: Swapped): void {
     token1.totalLiquidity = token1.totalLiquidity.minus(amountDest)
     token1.tradeVolume = token1.tradeVolume.plus(amountDest)
   }
-  token1.tradeVolumeUSD = token1.tradeVolumeUSD.plus(trackedAmountUSD === ZERO_BD ? derivedAmountUSD : trackedAmountUSD)
+  token1.tradeVolumeUSD = token1.tradeVolumeUSD.plus(trackedAmountUSD)
+  token1.untrackedVolumeUSD = token1.untrackedVolumeUSD.plus(derivedAmountUSD)
 
   // update txn counts
   token0.txCount = token0.txCount.plus(ONE_BI)
   token1.txCount = token1.txCount.plus(ONE_BI)
 
   // update pair volume data, use tracked amount if we have it as its probably more accurate
-  pair.volumeUSD = pair.volumeUSD.plus(trackedAmountUSD === ZERO_BD ? derivedAmountUSD : trackedAmountUSD)
+  pair.volumeUSD = pair.volumeUSD.plus(trackedAmountUSD)
+  pair.untrackedVolumeUSD = pair.untrackedVolumeUSD.plus(derivedAmountUSD)
   pair.volumeToken0 = pair.volumeToken0.plus(amount0)
   pair.volumeToken1 = pair.volumeToken1.plus(amount1)
   pair.txCount = pair.txCount.plus(ONE_BI)
@@ -402,6 +401,7 @@ export function handleSwap(event: Swapped): void {
   // update global values, only used tracked amounts for volume
   let mooniswap = MooniswapFactory.load(FACTORY_ADDRESS)
   mooniswap.totalVolumeUSD = mooniswap.totalVolumeUSD.plus(trackedAmountUSD)
+  mooniswap.untrackedVolumeUSD = mooniswap.untrackedVolumeUSD.plus(derivedAmountUSD)
   mooniswap.totalVolumeETH = mooniswap.totalVolumeETH.plus(trackedAmountETH)
   mooniswap.txCount = mooniswap.txCount.plus(ONE_BI)
 
@@ -468,17 +468,10 @@ export function handleSwap(event: Swapped): void {
 
   if (swap.referral.toHexString() != ADDRESS_ZERO) {
     let pairContract = PairContract.bind(event.address)
-    let newTotalSupply = pairContract.totalSupply()
     let referral = createLiquidityPosition(event.address, event.params.referral)
     referral.liquidityTokenBalance = convertTokenToDecimal(pairContract.balanceOf(event.params.referral), BI_18)
-    if (newTotalSupply == BigInt.fromI32(0)) {
-      referral.poolOwnership = BigDecimal.fromString('0.0')
-    } else {
-      referral.poolOwnership = referral.liquidityTokenBalance.div(
-        convertTokenToDecimal(newTotalSupply, BI_18)
-      )
-    }
     referral.save()
+    createLiquiditySnapshot(referral, event)
 
     let mints = transaction.mints
     if (mints.length > 0) {
@@ -507,16 +500,25 @@ export function handleSwap(event: Swapped): void {
 
   // get ids for date related entities
   let timestamp = event.block.timestamp.toI32()
+  // day info
   let dayID = timestamp / 86400
   let dayPairID = event.address
     .toHexString()
     .concat('-')
     .concat(BigInt.fromI32(dayID).toString())
 
+  // hourly info
+  let hourID = timestamp / 3600
+  let hourPairID = event.address
+    .toHexString()
+    .concat('-')
+    .concat(BigInt.fromI32(hourID).toString())
+
   // swap specific updating
   let mooniswapDayData = MooniswapDayData.load(dayID.toString())
   mooniswapDayData.dailyVolumeUSD = mooniswapDayData.dailyVolumeUSD.plus(trackedAmountUSD)
   mooniswapDayData.dailyVolumeETH = mooniswapDayData.dailyVolumeETH.plus(trackedAmountETH)
+  mooniswapDayData.dailyVolumeUntracked = mooniswapDayData.dailyVolumeUntracked.plus(derivedAmountUSD)
   mooniswapDayData.save()
 
   // swap specific updating for pair
@@ -525,6 +527,13 @@ export function handleSwap(event: Swapped): void {
   pairDayData.dailyVolumeToken1 = pairDayData.dailyVolumeToken1.plus(amount1)
   pairDayData.dailyVolumeUSD = pairDayData.dailyVolumeUSD.plus(trackedAmountUSD)
   pairDayData.save()
+
+  // update hourly pair data
+  let pairHourData = PairHourData.load(hourPairID)
+  pairHourData.hourlyVolumeToken0 = pairHourData.hourlyVolumeToken0.plus(amount0)
+  pairHourData.hourlyVolumeToken1 = pairHourData.hourlyVolumeToken1.plus(amount1)
+  pairHourData.hourlyVolumeUSD = pairHourData.hourlyVolumeUSD.plus(trackedAmountUSD)
+  pairHourData.save()
 
   // swap specific updating for token0
   let token0DayID = token0.id
