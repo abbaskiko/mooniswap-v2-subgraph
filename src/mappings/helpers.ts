@@ -27,7 +27,7 @@ export let ZERO_BD = BigDecimal.fromString('0')
 export let ONE_BD = BigDecimal.fromString('1')
 export let BI_18 = BigInt.fromI32(18)
 export let EXP_18 = BigInt.fromI32(10).pow(18)
-let fee = (BigInt.fromI32(10).pow(15)).times(BigInt.fromI32(3))
+export let uniswapFee = (BigInt.fromI32(10).pow(15)).times(BigInt.fromI32(3))
 
 export let factoryContract = FactoryContract.bind(Address.fromString(FACTORY_ADDRESS))
 
@@ -289,25 +289,12 @@ export function handleSync(pairAddress: Address): void {
   mooniswap.save()
 }
 
-export function calculateFormula(balA: BigInt, balB: BigInt, amount: BigInt): BigInt {
-  let taxedAmount = amount.minus(amount.times(fee).div(EXP_18))
-  return taxedAmount.times(balB).div(balA.plus(taxedAmount))
+export function getMooniswapFee(): BigInt {
+  let contract = FactoryContract.bind(Address.fromString(FACTORY_ADDRESS))
+  return contract.fee()
 }
 
-export function sqrtBN(val: BigInt): BigInt {
-
-  let z = ZERO_BI
-
-  if (val.gt(BigInt.fromI32(3))) {
-    z = val
-    let x = val.div(BigInt.fromI32(2)).plus(BigInt.fromI32(1))
-    while (x.lt(z)) {
-      z = x
-      x = (val.div(x).plus(x)).div(BigInt.fromI32(2))
-    }
-  } else if (!val.isZero()) {
-    z = BigInt.fromI32(1)
-  }
-
-  return z
+export function calculateFormula(balA: BigInt, balB: BigInt, amount: BigInt, fee: BigInt): BigInt {
+  let taxedAmount = amount.minus(amount.times(fee).div(EXP_18))
+  return taxedAmount.times(balB).div(balA.plus(taxedAmount))
 }

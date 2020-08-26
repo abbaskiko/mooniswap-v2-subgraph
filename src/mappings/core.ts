@@ -9,7 +9,7 @@ import {
   createLiquidityPosition, createLiquiditySnapshot,
   createUser,
   FACTORY_ADDRESS,
-  fetchReserves,
+  fetchReserves, getMooniswapFee,
   handleSync, ONE_BD,
   ONE_BI,
   ZERO_BD
@@ -405,11 +405,12 @@ export function handleSwap(event: Swapped): void {
   mooniswap.totalVolumeETH = mooniswap.totalVolumeETH.plus(trackedAmountETH)
   mooniswap.txCount = mooniswap.txCount.plus(ONE_BI)
 
-
+  let mooniswapFee = getMooniswapFee()
   let returnAmountWithoutVirtualBalances = calculateFormula(
     event.params.srcBalance,
     event.params.dstBalance,
-    event.params.amount
+    event.params.amount,
+    mooniswapFee
   )
   let winInFee = returnAmountWithoutVirtualBalances.minus(event.params.result)
   let lpExtraFee = winInFee.isZero()
@@ -476,8 +477,9 @@ export function handleSwap(event: Swapped): void {
     let mints = transaction.mints
     if (mints.length > 0) {
       let mint = Mint.load(mints[mints.length - 1].toString())
-      if (mint.amount0 === ONE_BD && mint.amount1 === ONE_BD) {
+      if (mint.amount0 === ZERO_BD && mint.amount1 === ZERO_BD) {
         swap.referralReward = mint.liquidity
+        swap.amountUSD = ZERO_BD
       }
     }
   }
