@@ -10,7 +10,7 @@ import {
   createUser,
   FACTORY_ADDRESS,
   fetchReserves, getMooniswapFee,
-  handleSync, ONE_BD,
+  handleSync,
   ONE_BI,
   ZERO_BD
 } from './helpers'
@@ -192,7 +192,6 @@ export function handleTransfer(event: Transfer): void {
     fromUserLiquidityPosition.liquidityTokenBalance = convertTokenToDecimal(pairContract.balanceOf(from), BI_18)
     fromUserLiquidityPosition.save()
     createLiquiditySnapshot(fromUserLiquidityPosition, event)
-    fromUserLiquidityPosition.save()
   }
 
   if (event.params.to.toHexString() != ADDRESS_ZERO && to.toHexString() != pair.id) {
@@ -252,11 +251,11 @@ export function handleMint(event: Deposited): void {
   mint.amountUSD = amountTotalUSD as BigDecimal
   mint.save()
 
+  handleSync(Address.fromString(pair.id))
   // update the LP position
   let liquidityPosition = createLiquidityPosition(event.address, mint.to as Address)
   createLiquiditySnapshot(liquidityPosition, event)
 
-  handleSync(Address.fromString(pair.id))
   // update day entities
   updatePairDayData(event)
   updatePairHourData(event)
@@ -314,11 +313,12 @@ export function handleBurn(event: Withdrawn): void {
   burn.amountUSD = amountTotalUSD as BigDecimal
   burn.save()
 
+  handleSync(Address.fromString(pair.id))
+
   // update the LP position
   let liquidityPosition = createLiquidityPosition(event.address, burn.sender as Address)
   createLiquiditySnapshot(liquidityPosition, event)
 
-  handleSync(Address.fromString(pair.id))
   // update day entities
   updatePairDayData(event)
   updatePairHourData(event)
@@ -467,6 +467,8 @@ export function handleSwap(event: Swapped): void {
   swap.amountUSD = trackedAmountUSD === ZERO_BD ? derivedAmountUSD : trackedAmountUSD
   swap.referralReward = ZERO_BD
 
+  handleSync(Address.fromString(pair.id))
+
   if (swap.referral.toHexString() != ADDRESS_ZERO) {
     let pairContract = PairContract.bind(event.address)
     let referral = createLiquidityPosition(event.address, event.params.referral)
@@ -492,7 +494,6 @@ export function handleSwap(event: Swapped): void {
   transaction.save()
 
 
-  handleSync(Address.fromString(pair.id))
   // update day entities
   updatePairDayData(event)
   updatePairHourData(event)
