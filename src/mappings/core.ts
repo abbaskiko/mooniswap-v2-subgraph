@@ -305,7 +305,7 @@ export function handleBurn(event: Withdrawn): void {
   mooniswap.save()
 
   // update burn
-  // burn.sender = event.params.sender
+  burn.sender = event.params.account
   burn.amount0 = token0Amount as BigDecimal
   burn.amount1 = token1Amount as BigDecimal
   // burn.to = event.params.to
