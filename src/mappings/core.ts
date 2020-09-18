@@ -313,11 +313,11 @@ export function handleBurn(event: Withdrawn): void {
   burn.amountUSD = amountTotalUSD as BigDecimal
   burn.save()
 
-  handleSync(Address.fromString(pair.id))
-
   // update the LP position
   let liquidityPosition = createLiquidityPosition(event.address, burn.sender as Address)
   createLiquiditySnapshot(liquidityPosition, event)
+
+  handleSync(Address.fromString(pair.id))
 
   // update day entities
   updatePairDayData(event)
